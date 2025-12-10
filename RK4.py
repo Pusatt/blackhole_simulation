@@ -1,157 +1,162 @@
 import numpy as np
 import matplotlib.pyplot as plt
 
-# --- SABİTLER ---
-# (Standart olarak G=1, M=1, c=1)
-G = 1.0
-M = 1.0  # Karadeliğin kütlesi
-C = 1.0  # Işık hızı
-SCHWARZSCHILD_RADIUS = 2 * G * M / (C**2) # Olay Ufku Yarıçapı
-# True = RK4 kullan, False = Euler kullan
-USE_RK4 = False
+class SchwarzschildGeodesic:
+    def __init__(self, rs):
+        # rs: Schwarzschild yarıçapı (2GM/c^2)
+        self.rs = rs # kara delik yarıçapı
 
-# =============================================================================
-# BÖLÜM 1: FİZİK MOTORU (Ömer ve Enes)
-# =============================================================================
-def calculate_acceleration(position, velocity):
-    """
-    Giriş: Konum (x,y,z), Hız (vx,vy,vz)
-    Çıkış: İvme (ax,ay,az)
-    Not: Gerçek projede burada Christoffel sembolleri ile Geodesic denklemi olacak.
-    """
-    x, y, z = position
-    r_sq = x**2 + y**2 + z**2
-    # koruma: r==0 durumundan kaçın
-    if r_sq == 0.0:
-        return np.array([0.0, 0.0, 0.0], dtype=float)
-    r = np.sqrt(r_sq)
+    def get_derivatives(self, state):
+        """
+        PDF'teki ivme denklemleri bu kısımda 
+        Girdi: [t, r, theta, phi, dt_dlam, dr_dlam, dtheta_dlam, dphi_dlam]
+        Çıktı: [dt, dr, dtheta, dphi, d2t, d2r, d2theta, d2phi]
+        """
+        t, r, theta, phi, ut, ur, utheta, uphi = state 
+        rs = self.rs
+        
+        # Singularity kontrolü. Eğer ışık olay ufkuna çarparsa durur.
+        if r <= rs:
+            return np.zeros_like(state) # Olay ufkuna çarptı
 
-    # --- TEST FİZİĞİ (Newtonian) ---
-    factor = -1.5 * G * M / (r_sq * r)
-    ax = factor * x
-    ay = factor * y
-    az = factor * z
+        # Ortak terimler
+        r_minus_rs = r - rs
+        sin_theta = np.sin(theta)
+        cos_theta = np.cos(theta)
+        
+        # ******************** İVME DENKLEMLERİ ********************
+        
+        # A) Zaman İvmesi (d2t)
+        # PDF Formülü: -(rs / (r * (r - rs))) * dr * dt
+        # Bu kısım karadeliğin zamanı nasıl büktüğünü hesaplar. PDF'teki d2t denklemi
+        a_t = - (rs / (r * r_minus_rs)) * ur * ut
 
-    return np.array([ax, ay, az], dtype=float)
+        # B) Radyal İvme (d2r)
+        # Bu en karmaşık denklem
+        term1 = (rs * r_minus_rs) / (2 * r**3) * (ut**2)
+        term2 = rs / (2 * r * r_minus_rs) * (ur**2)
+        # Term1 ve Term2 ışığın kütleçekim ile çekilmesini hesaplar
+        term3 = r_minus_rs * (utheta**2)
+        term4 = r_minus_rs * (sin_theta**2) * (uphi**2)
+        # Term4 merkezkaç etkisidir 
+        
+        # PDF'teki formül: -(term1 - term2 - term3 - term4)
+        a_r = - (term1 - term2 - term3 - term4)
+        # Bu denklemde a_r negatif çıkarsa ışık içeri çekilir, pozitif çıkarsa dışarı itilir.
 
-# =============================================================================
-# BÖLÜM 2: ENTEGRATÖRLER
-# =============================================================================
-def euler_step(position, velocity, dt):
-    a = calculate_acceleration(position, velocity)
-    new_pos = position + velocity * dt
-    new_vel = velocity + a * dt
-    return new_pos, new_vel
+        # C) Polar Açı İvmesi (d2theta)
+        # PDF Formülü: -( (2/r)*dr*dtheta - sin*cos*dphi^2 )
+        # Parantez içindeki eksi işareti dağılınca + olur. Açısal Momentumun korunumu.
+        a_theta = - ((2.0 / r) * ur * utheta - sin_theta * cos_theta * (uphi**2))
 
-def rk4_step(position, velocity, dt):
-    """
-    Runge-Kutta 4. Derece entegrasyonu ile bir sonraki adımı hesaplar.
-    """
-    k1_v = velocity
-    k1_a = calculate_acceleration(position, velocity)
+        # D) Azimutal Açı İvmesi (d2phi)
+        # PDF Formülü: -( (2/r)*dr*dphi + 2*cot*dtheta*dphi )
+        cot_theta = cos_theta / sin_theta
+        a_phi = - ((2.0 / r) * ur * uphi + 2.0 * cot_theta * utheta * uphi)
 
-    p2 = position + k1_v * (dt / 2)
-    v2 = velocity + k1_a * (dt / 2)
-    k2_v = v2
-    k2_a = calculate_acceleration(p2, v2)
+        # Türevleri döndüren kısım, buradaki çıktı bize bir sonraki adımı söyler.
+        return np.array([ut, ur, utheta, uphi, a_t, a_r, a_theta, a_phi])
 
-    p3 = position + k2_v * (dt / 2)
-    v3 = velocity + k2_a * (dt / 2)
-    k3_v = v3
-    k3_a = calculate_acceleration(p3, v3)
+    def rk4_step(self, state, h):
+        # h: Adım büyüklüğü (step size)
+        k1 = h * self.get_derivatives(state)
+        k2 = h * self.get_derivatives(state + 0.5 * k1)
+        k3 = h * self.get_derivatives(state + 0.5 * k2)
+        k4 = h * self.get_derivatives(state + k3)
+        
+        new_state = state + (k1 + 2*k2 + 2*k3 + k4) / 6.0
+        # Bu kısım kabaca durumlar içinden ağırlıklı ortalama alır ve yeni durumu hesaplar
+        return new_state
 
-    p4 = position + k3_v * dt
-    v4 = velocity + k3_a * dt
-    k4_v = v4
-    k4_a = calculate_acceleration(p4, v4)
+# --- TEST KISMI ---
 
-    new_position = position + (dt / 6.0) * (k1_v + 2*k2_v + 2*k3_v + k4_v)
-    new_velocity = velocity + (dt / 6.0) * (k1_a + 2*k2_a + 2*k3_a + k4_a)
-
-    return new_position, new_velocity
-
-# =============================================================================
-# BÖLÜM 3: SİMÜLASYON YÖNETİCİSİ (Main Loop)
-# =============================================================================
-def trace_ray(start_pos, start_vel, max_steps=5000, dt=0.05):
-    """
-    Bir ışın için tüm yörüngeyi hesaplar.
-    RK4 geçici olarak kapatılabilir (USE_RK4 sabiti).
-    """
-    history = [start_pos]
-    current_pos = np.array(start_pos, dtype=float)
-    current_vel = np.array(start_vel, dtype=float)
-
-    status = "escaped" # Varsayılan durum: kaçtı
+def run_test():
+    # 1. Ayarlar *********************
+    rs = 1.0  # Schwarzschild yarıçapını 1 birim kabul ettik 
+    solver = SchwarzschildGeodesic(rs)
     
-    if USE_RK4:
-        print("Integrator: RK4 (aktif)")
-    else:
-        print("Integrator: Euler (RK4 geçici olarak kapalı)")
+    # 2. Başlangıç Koşulları *********************
+    # Işığı kara deliğe doğru ama biraz yandan gönderdik
+    r_start = 20.0 * rs
+    phi_start = 0.0 # Başlangıç açısı
+    
+    # Ekvator düzleminde hareket etsin (Theta = 90 derece = pi/2)
+    # Bu, denklemleri basitleştirir ve test etmeyi kolaylaştırır.
+    theta_start = np.pi / 2 
+    
+    # Hızlar (Null Geodesic koşulu sağlanmalı: ds^2 = 0)
+    # Basit bir yaklaşım için ışık hızı c=1 kabul edelim.
+    # Işık uzaktan geliyor, merkeze doğru (ur negatif) ve yana doğru (uphi pozitif)
+    dt_start = 1.0
+    dr_start = -1.0 # Merkeze doğru
+    dtheta_start = 0.0 # Düzlemden çıkmasın
+    
+    # Impact parameter (b) ayarı: Işının kara delikten ne kadar yandan geçeceğini ile ilgili 
+    # Yani açısal momentumu belirler. Eğer b < 5.2 rs ise düşer, b > 5.2 rs ise sapar.
+    # 5.2 rastgele bir değer değildir. Schwarzschild metrikte ışığın karadeliğe düşmemesi için gereken minimum yarıçaptır
+    # dphi'yi buna göre ayarlıyoruz (yaklaşık bir değer)
+    impact_parameter = 6.0 * rs  
+    dphi_start = impact_parameter / (r_start**2) 
 
-    for step in range(max_steps):
-        # adım at (USE_RK4 kontrolü)
-        if USE_RK4:
-            current_pos, current_vel = rk4_step(current_pos, current_vel, dt)
-        else:
-            current_pos, current_vel = euler_step(current_pos, current_vel, dt)
+    # State vektörü: [t, r, theta, phi, dt, dr, dtheta, dphi]
+    current_state = np.array([0.0, r_start, theta_start, phi_start, dt_start, dr_start, dtheta_start, dphi_start])
 
-        history.append(current_pos)
+    # 3. Simülasyon Döngüsü *********************
+    steps = 2000
+    h = 0.5 # Adım büyüklüğü (dikkatli seçilmeli)
+    
+    trajectory_x = []
+    trajectory_y = []
 
-        # Olay Ufku Kontrolü (Karadeliğe düştü mü?)
-        dist_from_center = np.linalg.norm(current_pos)
-        if dist_from_center < SCHWARZSCHILD_RADIUS:
-            status = "captured"
+    print("\nSimülasyon sorunsuz bir şekilde başladı.")
+    for i in range(steps):
+        # Ekrana çizdirmek için koordinatları çeviriyoruz
+        r_val = current_state[1]
+        phi_val = current_state[3]
+        
+        x = r_val * np.cos(phi_val)
+        y = r_val * np.sin(phi_val)
+        
+        trajectory_x.append(x)
+        trajectory_y.append(y)
+        
+        # RK4 Adımı
+        current_state = solver.rk4_step(current_state, h)
+        
+        # Olay ufkuna düştü mü kontrolü
+        if current_state[1] < rs * 1.01:
+            print(f"Işık {i}. adımda olay ufkuna düştü.")
+            break
+            
+        # Çok uzaklaştı mı?
+        if current_state[1] > r_start * 1.5:
+            print(f"Işık {i}. adımda sistemden kaçtı.")
             break
 
-        # Çok uzaklaştı mı? (Simülasyon dışına çıktı mı?)
-        if dist_from_center > 50.0:
-            status = "escaped"
-            break
-
-    return np.array(history), status
-
-# =============================================================================
-# TEST VE GÖRSELLEŞTİRME
-# =============================================================================
-if __name__ == "__main__":
-    # Örnek: Uzaktan geçen bir ışın (bükülüp yoluna devam etmeli)
-    start_p = np.array([10.0, 3.0, 0.0])
-    start_v = np.array([-1.0, 0.0, 0.0])
-
-    path, result = trace_ray(start_p, start_v)
-
-    print(f"Simülasyon Bitti! Sonuç: {result}")
-    print(f"Toplam Adım: {len(path)}")
-
-    # 3D Çizim
-    fig = plt.figure(figsize=(10, 8))
-    ax = fig.add_subplot(111, projection='3d')
-
-    # Karadeliği Temsilen Siyah Küre
-    u, v = np.mgrid[0:2*np.pi:20j, 0:np.pi:10j]
-    x_bh = SCHWARZSCHILD_RADIUS * np.cos(u) * np.sin(v)
-    y_bh = SCHWARZSCHILD_RADIUS * np.sin(u) * np.sin(v)
-    z_bh = SCHWARZSCHILD_RADIUS * np.cos(v)
-    ax.plot_surface(x_bh, y_bh, z_bh, color='black', alpha=0.8)
-
+    # 4. Görselleştirme *********************
+    plt.figure(figsize=(10, 6))
+    
+    # Olay Ufku
+    circle = plt.Circle((0, 0), rs, color='black', label='Olay Ufku ($R_s$)')
+    plt.gca().add_patch(circle)
+    
+    # Foton Yörüngesi (Photon Sphere - 1.5 Rs)
+    circle_ph = plt.Circle((0, 0), 1.5*rs, color='red', fill=False, linestyle='--', label='Foton Yörüngesi')
+    plt.gca().add_patch(circle_ph)
+    
     # Işığın Yolu
-    ax.plot(path[:,0], path[:,1], path[:,2], color='cyan', linewidth=2, label='Foton Yolu')
-
-    # Başlangıç noktası
-    ax.scatter(start_p[0], start_p[1], start_p[2], color='red', s=50, label='Başlangıç')
-
-    # Ayarlar
-    ax.set_xlabel('X')
-    ax.set_ylabel('Y')
-    ax.set_zlabel('Z')
-    ax.set_title(f'Integrator={"RK4" if USE_RK4 else "Euler"} - Işın Durumu: {result}')
-    ax.legend()
-
-    # Eşit ölçekleme (Görüntü bozulmasın diye)
-    limit = 12
-    ax.set_xlim([-limit, limit])
-    ax.set_ylim([-limit, limit])
-    ax.set_zlim([-limit, limit])
-
+    plt.plot(trajectory_x, trajectory_y, label='Işık Yolu', color='blue')
+    
+    # Kaynak
+    plt.scatter(trajectory_x[0], trajectory_y[0], color='orange', label='Kaynak')
+    
+    plt.title(f"Test Simülasyonu (b={impact_parameter/rs} Rs)")
+    plt.xlabel("x / Rs")
+    plt.ylabel("y / Rs")
+    plt.legend()
+    plt.grid(True)
+    plt.axis('equal')
     plt.show()
+
+if __name__ == "__main__":
+    run_test()
