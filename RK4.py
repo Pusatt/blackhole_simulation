@@ -7,11 +7,9 @@ class SchwarzschildGeodesic:
         self.rs = rs # kara delik yarıçapı
 
     def get_derivatives(self, state):
-        """
-        PDF'teki ivme denklemleri bu kısımda 
-        Girdi: [t, r, theta, phi, dt_dlam, dr_dlam, dtheta_dlam, dphi_dlam]
-        Çıktı: [dt, dr, dtheta, dphi, d2t, d2r, d2theta, d2phi]
-        """
+        # PDF'teki ivme denklemleri bu kısımda 
+        # Girdi: [t, r, theta, phi, dt_dlam, dr_dlam, dtheta_dlam, dphi_dlam]
+        # Çıktı: [dt, dr, dtheta, dphi, d2t, d2r, d2theta, d2phi]
         t, r, theta, phi, ut, ur, utheta, uphi = state 
         rs = self.rs
         
@@ -68,6 +66,44 @@ class SchwarzschildGeodesic:
         # Bu kısım kabaca durumlar içinden ağırlıklı ortalama alır ve yeni durumu hesaplar
         return new_state
 
+# --- YENİ EKLENEN FİZİK HESAPLAYICI ---
+def get_precise_initial_state(b, r_start, rs):
+    """
+    Verilen impact parameter (b) için tam fiziksel hızları hesaplar.
+    Bu fonksiyon, "elle" hız girmek yerine korunum yasalarını kullanır.
+    """
+    # 1. Enerjiyi (E) 1 birim kabul edelim (Foton için ölçek fark etmez)
+    E = 1.0
+    
+    # 2. Açısal Momentum (L) = b * E
+    L = b * E
+    
+    # 3. Konumlar
+    theta = np.pi / 2
+    phi = 0.0
+    
+    # 4. Schwarzschild Metriğinden türetilen hızlar
+    # Zaman hızı (dt/dlambda)
+    ut = E / (1.0 - rs / r_start)
+    
+    # Açısal hız (dphi/dlambda)
+    uphi = L / (r_start**2)
+    
+    # Radyal hız (dr/dlambda) - Null Geodesic Şartından (ds^2=0 olmalı)
+    # -(1-rs/r)ut^2 + (1/(1-rs/r))ur^2 + r^2*uphi^2 = 0 denkleminin çözümü:
+    metric_factor = 1.0 - rs / r_start
+    term_t = -metric_factor * (ut**2)
+    term_phi = (r_start**2) * (uphi**2)
+    
+    ur_squared = -metric_factor * (term_t + term_phi)
+    
+    if ur_squared < 0:
+        return None # Fiziksel olarak imkansız durum
+        
+    ur = -np.sqrt(ur_squared) # Eksi çünkü merkeze doğru gidiyor
+    
+    return np.array([0.0, r_start, theta, phi, ut, ur, 0.0, uphi])
+
 # --- TEST KISMI ---
 
 def run_test():
@@ -78,39 +114,27 @@ def run_test():
     # 2. Başlangıç Koşulları *********************
     # Işığı kara deliğe doğru ama biraz yandan gönderdik
     r_start = 20.0 * rs
-    phi_start = 0.0 # Başlangıç açısı
-    
-    # Ekvator düzleminde hareket etsin (Theta = 90 derece = pi/2)
-    # Bu, denklemleri basitleştirir ve test etmeyi kolaylaştırır.
-    theta_start = np.pi / 2 
-    
-    # Hızlar (Null Geodesic koşulu sağlanmalı: ds^2 = 0)
-    # Basit bir yaklaşım için ışık hızı c=1 kabul edelim.
-    # Işık uzaktan geliyor, merkeze doğru (ur negatif) ve yana doğru (uphi pozitif)
-    dt_start = 1.0
-    dr_start = -1.0 # Merkeze doğru
-    dtheta_start = 0.0 # Düzlemden çıkmasın
     
     # Impact parameter (b) ayarı: Işının kara delikten ne kadar yandan geçeceğini ile ilgili 
-    # Yani açısal momentumu belirler. Eğer b < 5.2 rs ise düşer, b > 5.2 rs ise sapar.
-    # 5.2 rastgele bir değer değildir. Schwarzschild metrikte ışığın karadeliğe düşmemesi için gereken minimum yarıçaptır
-    # dphi'yi buna göre ayarlıyoruz (yaklaşık bir değer)
-    impact_parameter = 6.0 * rs  
-    dphi_start = impact_parameter / (r_start**2) 
-
-    # State vektörü: [t, r, theta, phi, dt, dr, dtheta, dphi]
-    current_state = np.array([0.0, r_start, theta_start, phi_start, dt_start, dr_start, dtheta_start, dphi_start])
+    # Yani açısal momentumu belirler. Eğer b < 2.6 rs ise düşer, b > 2.6 rs ise sapar.
+    # 2.6 rastgele bir değer değildir. Schwarzschild metrikte ışığın karadeliğe düşmemesi için gereken minimum yarıçaptır
+    impact_parameter = 3 * rs  
+    
+    current_state = get_precise_initial_state(impact_parameter, r_start, rs)
+    if current_state is None:
+        print("Hata: Başlangıç koşulları fiziksel değil.")
+        return
 
     # 3. Simülasyon Döngüsü *********************
-    steps = 2000
-    h = 0.5 # Adım büyüklüğü (dikkatli seçilmeli)
+    steps = 10000 # Adım sayısı artırıldı
+    h = 0.05      # DAHA HASSAS HESAP İÇİN ADIM BÜYÜKLÜĞÜNÜ KÜÇÜLT
     
     trajectory_x = []
     trajectory_y = []
 
-    print("\nSimülasyon sorunsuz bir şekilde başladı.")
+    print(f"\nSimülasyon b={impact_parameter/rs} Rs için başladı...")
     for i in range(steps):
-        # Ekrana çizdirmek için koordinatları çeviriyoruz
+        # Ekrana çizdirmek için koordinatları dönüştürüyoruz
         r_val = current_state[1]
         phi_val = current_state[3]
         
@@ -125,7 +149,7 @@ def run_test():
         
         # Olay ufkuna düştü mü kontrolü
         if current_state[1] < rs * 1.01:
-            print(f"Işık {i}. adımda olay ufkuna düştü.")
+            print(f"Işık {i}. adımda olay ufkuna düştü! (Simülasyon Başarılı)")
             break
             
         # Çok uzaklaştı mı?
