@@ -1,10 +1,10 @@
-from utils import *
-from scene import *
-from camera import *
+from scene import Scene, BlackHole, Sphere
+from shaders import Background
+from camera import Camera
 
 from PIL import Image
 import numpy as np
-import math
+
 
 bg_index = 1
 
@@ -16,6 +16,7 @@ height = 1080
 fov = 80
 step_size = 0.001
 max_steps = 100
+
 
 space = Scene()
 
@@ -51,4 +52,5 @@ img.show()
 #new_size = (img.width * scale_factor, img.height * scale_factor)
 #img_large = img.resize(new_size, resample=Image.NEAREST)
 #img_large.show()
+
 
