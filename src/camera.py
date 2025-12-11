@@ -1,6 +1,5 @@
-from utils import *
+from utils import cartesian_to_spherical, spherical_to_cartesian
 from scene import Sphere
-from shaders import Background
 
 import numpy as np
 import math
@@ -151,3 +150,4 @@ class Camera:
             return np.array([5.0, 2.0, 0.0]) #Döngü tamamlansa da hala çarpışmayanlar için hata kontrolü kırmızı renk
                 
     
+
