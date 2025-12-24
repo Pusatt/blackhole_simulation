@@ -4,8 +4,8 @@ import sys
 
 # Klasör yolu (Scriptin çalıştığı yerin tam yolunu alalım ki hata olmasın)
 script_dir = os.path.dirname(os.path.abspath(__file__))
-image_folder = os.path.join(script_dir, 'render_frames_hq')
-video_name = 'final_blackhole.mp4'
+image_folder = os.path.join(script_dir, 'render_frames_video')
+video_name = 'Simulation.mp4'
 
 # 1. Klasör kontrolü
 if not os.path.exists(image_folder):
@@ -39,4 +39,5 @@ for i, image in enumerate(images):
 
 cv2.destroyAllWindows()
 video.release()
+
 print(f"Video başarıyla oluşturuldu: {video_name}")
