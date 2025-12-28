@@ -85,17 +85,23 @@ To run this mode, your computer must have an **NVIDIA** graphics card.
 Once the prerequisites are installed, you need to set up the required Python libraries.
 
 1.  Open the **Anaconda Prompt** application (search for "Anaconda Prompt" in your Start menu).
+
+    <img width="412" height="798" alt="image" src="https://github.com/user-attachments/assets/e6bcd5cc-8cd9-4011-b7d1-98bea66749c2" />
+    
 2.  Run the following command to install the core GPU computing libraries (type `y` and hit Enter if asked for confirmation):
 
     ```bash
     conda install numba cudatoolkit scipy
     ```
+    <img width="1112" height="621" alt="image" src="https://github.com/user-attachments/assets/c532c4ef-3414-41e0-943e-3df722e92110" />
 
 3.  Run the following command to install the image processing and utility libraries:
 
     ```bash
     pip install opencv-python pillow numpy
     ```
+
+    <img width="1113" height="627" alt="image" src="https://github.com/user-attachments/assets/b0b8f361-dbc3-4406-9808-81bfaecaebed" />
 
 ### 📂 3. File Structure
 For the simulation to run correctly, the folder structure is critical:
@@ -110,7 +116,6 @@ For the simulation to run correctly, the folder structure is critical:
 ### 🚀 4. Running the Simulation
 
 1. Open the Anaconda prompt by simply typing anaconda on your search bar and opening the application
-   <img width="412" height="798" alt="image" src="https://github.com/user-attachments/assets/e6bcd5cc-8cd9-4011-b7d1-98bea66749c2" />
 
 
 2.  In **Anaconda Prompt**, use the `cd` command to navigate into the `src_gpu` folder. (Adjust the path below to match your computer):
