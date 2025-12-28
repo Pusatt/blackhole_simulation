@@ -14,9 +14,9 @@ graph TD
         subgraph Ray_Marching [Fizik Döngüsü / Ray Tracing]
             CheckSteps{"Adım Sayısı < Max?"}
             CheckSteps -- Hayır (Zaman Aşımı) --> ErrColor[Hata Rengi Döndür Kırmızı]
-            CheckSteps -- Evet --> ColSphere{"Küre ile<br/>Çarpışma Var mı?"}
+            CheckSteps -- Evet --> ColSphere{"Başka bir cisim ile<br/>Çarpışma Var mı?"}
             
-            ColSphere -- Evet --> RetSphere[Küre Rengini Döndür]
+            ColSphere -- Evet --> RetSphere[Cismin Rengini Döndür]
             ColSphere -- Hayır --> ColEH{"Olay Ufkuna<br/>(Event Horizon)<br/>Girdi mi?"}
             
             ColEH -- Evet (r <= rs) --> RetBlack["Siyah Renk Döndür (0,0,0)"]
