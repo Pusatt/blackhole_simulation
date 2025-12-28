@@ -25,6 +25,8 @@ Furkan KART
 Muhammed Pusat ÖZÇELİK
 Ömer Faruk KOLAYCA
 
+Sorularınız için cemkutaynancin@gmail.com adresine mail atabilirsiniz.
+
 ## 🚀 How to Run? (CPU Version)
 
 This project performs a black hole simulation using the Ray Tracing method on the processor (CPU) with Python.
