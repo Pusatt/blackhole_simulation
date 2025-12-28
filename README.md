@@ -38,11 +38,13 @@ Before running the project, ensure the following Python libraries are installed:
 Correct folder structure is critical for the project to run without errors:
 1.  Download the **`src`** (source code) and **`assets`** (background images) folders to your computer.
 2.  **Important:** Ensure that the `src` and `assets` folders are located side-by-side **within the same parent directory**. The program uses this structure to locate the space background.
+   * Example Structure:
+        * 📁 `My_Project/`
+            * 📁 `src/`
+            * 📁 `assets/`
 
 ### 2. Running
-After installing the required libraries, navigate into the `src` folder via terminal and run the **`main.py`** file.
-
-    python main.py
+After installing the required libraries, navigate into the `src` folder via file explorer and run the **`main.py`** file.
 
 ✅ **Result:** Once the render is complete, the generated black hole image will **automatically open in your computer's default image viewer.**
 
@@ -107,13 +109,17 @@ For the simulation to run correctly, the folder structure is critical:
 
 ### 🚀 4. Running the Simulation
 
-1.  In **Anaconda Prompt**, use the `cd` command to navigate into the `src_gpu` folder. (Adjust the path below to match your computer):
+1. Open the Anaconda prompt by simply typing anaconda on your search bar and opening the application
+   <img width="412" height="798" alt="image" src="https://github.com/user-attachments/assets/e6bcd5cc-8cd9-4011-b7d1-98bea66749c2" />
+
+
+2.  In **Anaconda Prompt**, use the `cd` command to navigate into the `src_gpu` folder. (Adjust the path below to match your computer):
 
     ```bash
     cd C:\Users\YourUsername\Desktop\My_Project\src_gpu
     ```
 
-2.  To render a single high-quality frame, run:
+3.  To render a single high-quality frame, run:
 
     ```bash
     python render_frame.py
